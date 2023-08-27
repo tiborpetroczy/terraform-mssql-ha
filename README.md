@@ -90,9 +90,51 @@ Description: Specifies the resource group name
 
 Type: `string`
 
-#### <a name="input_sql_svc_password"></a> [sql\_svc\_password](#input\_sql\_svc\_password)
+#### <a name="input_sql_image_offer"></a> [sql\_image\_offer](#input\_sql\_image\_offer)
 
-Description: (Required) The default password for default SQL service accounts (local and domain).
+Description: (Required) The offer type of the marketplace image cluster to be used by the SQL Virtual Machine Group. Changing this forces a new resource to be created.
+
+Type: `string`
+
+#### <a name="input_sql_image_sku"></a> [sql\_image\_sku](#input\_sql\_image\_sku)
+
+Description:  (Required) The sku type of the marketplace image cluster to be used by the SQL Virtual Machine Group. Possible values are Developer and Enterprise.
+
+Type: `string`
+
+#### <a name="input_sql_service_account_password"></a> [sql\_service\_account\_password](#input\_sql\_service\_account\_password)
+
+Description: (Required) The SQL Server service account password to create.
+
+Type: `string`
+
+#### <a name="input_sql_sysadmin_login"></a> [sql\_sysadmin\_login](#input\_sql\_sysadmin\_login)
+
+Description: (Required) The SQL Server sysadmin login to create.
+
+Type: `string`
+
+#### <a name="input_sql_sysadmin_password"></a> [sql\_sysadmin\_password](#input\_sql\_sysadmin\_password)
+
+Description: (Required) The SQL Server sysadmin password to create.
+
+Type: `string`
+
+#### <a name="input_sql_vm_image_offer"></a> [sql\_vm\_image\_offer](#input\_sql\_vm\_image\_offer)
+
+Description: (Required) Specifies the offer of the image used to create the virtual machines. Changing this forces a new resource to be created.
+
+Type: `string`
+
+#### <a name="input_sql_vm_image_publisher"></a> [sql\_vm\_image\_publisher](#input\_sql\_vm\_image\_publisher)
+
+Description: (Required) Specifies the publisher of the image used to create the virtual machines. Changing this forces a new resource to be created.
+
+Type: `string`
+
+#### <a name="input_sql_vm_image_sku"></a> [sql\_vm\_image\_sku](#input\_sql\_vm\_image\_sku)
+
+Description: (Required) Specifies the SKU of the image used to create the virtual machines. Changing this forces a new resource to be created.
 
 Type: `string`
 
@@ -154,9 +196,13 @@ Default: `2`
 
 The following outputs are exported:
 
+#### <a name="output_client_public_ip"></a> [client\_public\_ip](#output\_client\_public\_ip)
+
+Description: The public IP address of local developer machine.
+
 #### <a name="output_primary_dc_private_ip_address"></a> [primary\_dc\_private\_ip\_address](#output\_primary\_dc\_private\_ip\_address)
 
-Description: The private IP address of primary Domain Controller
+Description: The private IP address of primary Domain Controller.
 
 #### <a name="output_storage_account_endpoint"></a> [storage\_account\_endpoint](#output\_storage\_account\_endpoint)
 
