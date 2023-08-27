@@ -1,23 +1,59 @@
 locals {
-  # Generate command to install DNS and AD Forest
-  cmd00           = "Set-NetFirewallProfile -Enabled False"
-  cmd01           = "Install-WindowsFeature AD-Domain-Services -IncludeAllSubFeature -IncludeManagementTools"
-  cmd02           = "Install-WindowsFeature DNS -IncludeAllSubFeature -IncludeManagementTools"
-  cmd03           = "Import-Module ADDSDeployment, DnsServer"
-  cmd04           = "Install-ADDSForest -DomainName ${var.domain_name} -NoRebootOnCompletion:$false -Force:$true -SafeModeAdministratorPassword (ConvertTo-SecureString ${random_password.pwd.result} -AsPlainText -Force)"
-  powershell_gpmc = "${local.cmd00}; ${local.cmd01}; ${local.cmd02}; ${local.cmd03}; ${local.cmd04};"
-
-  start_tran_aduser   = "Start-Transcript -Path C:\\Temp\\transcript_aduser.txt"
-  cmd05               = "Import-Module ActiveDirectory"
-  cmd06               = "New-ADOrganizationalUnit -Name 'Servers' -Path '${local.dn_path}' -Description 'Servers OU for new objects'"
-  cmd07               = "$secPass = ConvertTo-SecureString '${var.sql_svc_password}' -AsPlainText -Force"
-  cmd08               = "New-ADUser -Name install -GivenName install -Surname install -UserPrincipalName 'install@${var.domain_name}' -SamAccountName install -AccountPassword $secPass -Enabled $true"
-  cmd09               = "New-ADUser -Name sqlsvc -GivenName sqlsvc -Surname sqlsvc -UserPrincipalName 'sqlsvc@${var.domain_name}' -SamAccountName sqlsvc -AccountPassword $secPass -Enabled $true"
-  stop_tran_aduser    = "Stop-Transcript"
-  powershell_add_user = "${local.start_tran_aduser}; ${local.cmd05}; ${local.cmd06}; ${local.cmd07}; ${local.cmd08}; ${local.cmd09}; ${local.stop_tran_aduser}"
-
-  # Generate locals for domain join
+  # Generate locals for domain join parameters
   split_domain    = split(".", var.domain_name)
   dn_path         = join(",", [for dc in local.split_domain : "DC=${dc}"])
   servers_ou_path = "OU=Servers,${join(",", [for dc in local.split_domain : "DC=${dc}"])}"
+
+  # Generate commands to install DNS and AD Forest
+  powershell_gpmc = [
+    "Set-NetFirewallProfile -Enabled False",
+    "Install-WindowsFeature AD-Domain-Services -IncludeAllSubFeature -IncludeManagementTools",
+    "Install-WindowsFeature DNS -IncludeAllSubFeature -IncludeManagementTools",
+    "Import-Module ADDSDeployment, DnsServer",
+    "Install-ADDSForest -DomainName ${var.domain_name} -NoRebootOnCompletion:$false -Force:$true -SafeModeAdministratorPassword (ConvertTo-SecureString ${random_password.pwd.result} -AsPlainText -Force)"
+  ]
+  #powershell_gpmc_joined = join(";", local.powershell_gpmc)
+
+  # Generate commands to create new Organization Unit and technical users for SQL installation
+  powershell_add_users = [
+    "Start-Transcript -Path C:\\Temp\\transcript_aduser.txt",
+    "Import-Module ActiveDirectory",
+    "New-ADOrganizationalUnit -Name 'Servers' -Path '${local.dn_path}' -Description 'Servers OU for new objects'",
+    "$secPass = ConvertTo-SecureString '${var.sql_service_account_password}' -AsPlainText -Force",
+    "New-ADUser -Name install -GivenName install -Surname install -UserPrincipalName 'install@${var.domain_name}' -SamAccountName install -AccountPassword $secPass -Enabled $true",
+    "New-ADUser -Name sqlsvc -GivenName sqlsvc -Surname sqlsvc -UserPrincipalName 'sqlsvc@${var.domain_name}' -SamAccountName sqlsvc -AccountPassword $secPass -Enabled $true",
+    "Add-ADGroupMember -Identity 'Domain Admins' -Members install",
+    "Stop-Transcript"
+  ]
+
+  # Generate commands to add install domain account to local administrators group on SQL servers and to sysadmin roles on SQL
+  powershell_local_admin = [
+    "Start-Transcript -Path C:\\Temp\\transcript_local_admin.txt",
+    "Get-LocalGroup",
+    "Add-LocalGroupMember -Group 'Administrators' -Member '${var.domain_netbios_name}\\install'",
+    "Stop-Transcript"
+  ]
+
+  # Generate commands to add install domain account to sysadmin roles on SQL servers
+  powershell_sql_sysadmin = [
+    "Start-Transcript -Path C:\\Temp\\transcript_sql_sysadmin.txt",
+    "Invoke-Sqlcmd -ServerInstance 'localhost' -Database 'master' -Query 'CREATE LOGIN [SQLHALAB\\install] FROM WINDOWS WITH DEFAULT_DATABASE=[master]; EXEC master..sp_addsrvrolemember @loginame = ''SQLHALAB\\install'', @rolename = ''sysadmin'';' -QueryTimeout '10'",
+    "Stop-Transcript"
+  ]
+
+  # Generate commands to add special ACL permission to cluster computer object
+  powershell_acl_commands = [
+    "Start-Transcript -Path C:\\Temp\\transcript_acl.txt",
+    "$Computer = Get-ADComputer ${var.sqlcluster_name}",
+    "$ComputerSID = [System.Security.Principal.SecurityIdentifier] $Computer.SID",
+    "$ACL = Get-Acl -Path 'AD:${local.servers_ou_path}'",
+    "$Identity = [System.Security.Principal.IdentityReference] $ComputerSID",
+    "$ADRight = [System.DirectoryServices.ActiveDirectoryRights] 'GenericAll'",
+    "$Type = [System.Security.AccessControl.AccessControlType] 'Allow'",
+    "$InheritanceType = [System.DirectoryServices.ActiveDirectorySecurityInheritance] 'All'",
+    "$Rule = New-Object System.DirectoryServices.ActiveDirectoryAccessRule($Identity, $ADRight, $Type,  $InheritanceType)",
+    "$ACL.AddAccessRule($Rule)",
+    "Set-Acl -Path 'AD:${local.servers_ou_path}' -AclObject $ACL",
+    "Stop-Transcript"
+  ]
 }

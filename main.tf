@@ -1,9 +1,16 @@
 data "azurerm_client_config" "current" {}
 
+data "http" "myip" {
+  url = "https://icanhazip.com"
+}
+
 # Create SQL HA resource group
 resource "azurerm_resource_group" "rg" {
   name     = var.resource_group_name
   location = var.location
+  lifecycle {
+    ignore_changes = [tags]
+  }
 }
 
 # Create general password for virtuam machines

@@ -1,4 +1,4 @@
-formatter: "markdown document" # this is required
+formatter: "markdown document"
 
 header-from: docs/header.md
 

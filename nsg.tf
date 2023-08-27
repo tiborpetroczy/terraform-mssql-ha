@@ -4,6 +4,7 @@ resource "azurerm_network_security_group" "nsg" {
   location            = azurerm_resource_group.rg.location
   resource_group_name = azurerm_resource_group.rg.name
 
+  # Create RDP rule to VMs from current local machine public IP
   security_rule {
     name                       = "RDP"
     priority                   = 101
@@ -12,7 +13,7 @@ resource "azurerm_network_security_group" "nsg" {
     protocol                   = "Tcp"
     source_port_range          = "*"
     destination_port_range     = "3389"
-    source_address_prefix      = "89.134.29.249"
+    source_address_prefix      = chomp(data.http.myip.response_body)
     destination_address_prefix = "*"
   }
   security_rule {
@@ -23,7 +24,11 @@ resource "azurerm_network_security_group" "nsg" {
     protocol                   = "Tcp"
     source_port_range          = "*"
     destination_port_range     = "*"
-    source_address_prefix      = "89.134.29.249"
+    source_address_prefix      = chomp(data.http.myip.response_body)
     destination_address_prefix = "*"
+  }
+
+  lifecycle {
+    ignore_changes = [tags]
   }
 }

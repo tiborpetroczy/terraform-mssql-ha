@@ -5,6 +5,10 @@ resource "azurerm_public_ip" "dc1" {
   resource_group_name = azurerm_resource_group.rg.name
   location            = azurerm_resource_group.rg.location
   allocation_method   = "Dynamic"
+
+  lifecycle {
+    ignore_changes = [tags]
+  }
 }
 
 # Create network interface for primary domain controller
@@ -18,6 +22,10 @@ resource "azurerm_network_interface" "dc1" {
     subnet_id                     = azurerm_subnet.dc.id
     private_ip_address_allocation = "Dynamic"
     public_ip_address_id          = azurerm_public_ip.dc1.id
+  }
+
+  lifecycle {
+    ignore_changes = [tags]
   }
 }
 
@@ -54,7 +62,11 @@ resource "azurerm_windows_virtual_machine" "dc1" {
   }
 
   winrm_listener {
-    protocol = "Http" # "Https"
+    protocol = "Http"
+  }
+
+  lifecycle {
+    ignore_changes = [tags]
   }
 }
 
@@ -69,6 +81,9 @@ resource "azurerm_virtual_machine_extension" "openssh" {
   depends_on = [
     azurerm_windows_virtual_machine.dc1
   ]
+  lifecycle {
+    ignore_changes = [tags]
+  }
 }
 
 # Create extension to install DNS and AD Forest
@@ -82,7 +97,7 @@ resource "azurerm_virtual_machine_extension" "gpmc" {
 
   settings = <<SETTINGS
     {
-    "commandToExecute": "powershell.exe -Command \"${local.powershell_gpmc}\""
+    "commandToExecute": "powershell.exe -Command \"${join(";", local.powershell_gpmc)}\""
     }
   SETTINGS
 
@@ -90,13 +105,23 @@ resource "azurerm_virtual_machine_extension" "gpmc" {
     azurerm_windows_virtual_machine.dc1,
     azurerm_virtual_machine_extension.openssh
   ]
+
+  lifecycle {
+    ignore_changes = [tags, settings]
+  }
+}
+
+resource "time_sleep" "gpmc" {
+  depends_on      = [azurerm_virtual_machine_extension.gpmc]
+  create_duration = "60s"
 }
 
 # Create Azure AD technical users with remote-exec module to use PowerShell
 resource "terraform_data" "ad_user" {
   triggers_replace = [
     azurerm_virtual_machine_extension.openssh.id,
-    azurerm_virtual_machine_extension.gpmc.id
+    azurerm_virtual_machine_extension.gpmc.id,
+    time_sleep.gpmc.id
   ]
 
   # With SSH connection
@@ -111,7 +136,9 @@ resource "terraform_data" "ad_user" {
     }
 
     inline = [
-      "powershell.exe -Command \"${local.powershell_add_user}\""
+      "powershell.exe -Command \"${join(";", local.powershell_add_users)}\""
     ]
   }
+
+  depends_on = [time_sleep.gpmc]
 }

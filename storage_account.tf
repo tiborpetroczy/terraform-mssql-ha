@@ -6,6 +6,9 @@ resource "azurerm_storage_account" "stga" {
   location                 = azurerm_resource_group.rg.location
   account_tier             = "Standard"
   account_replication_type = "LRS"
+  lifecycle {
+    ignore_changes = [tags]
+  }
 }
 
 # Create blob container under the storage account
